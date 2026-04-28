@@ -167,3 +167,11 @@ export function getMarketRingState(
     secondProgress,
   };
 }
+
+export function getMarketSessionState(
+  now: Date | null,
+  timeZone: string,
+  session: SessionHours,
+) {
+  return getMarketRingState(now, timeZone, session).sessionState;
+}

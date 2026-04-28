@@ -1,5 +1,6 @@
 "use client";
 
+import { ActiveMarketCards } from "@/components/active-market-cards";
 import { MarketClock } from "@/components/market-clock";
 import { useCurrentTime } from "@/hooks/use-current-time";
 import { CLOCKS } from "@/lib/clocks";
@@ -14,6 +15,7 @@ export function ClockGrid() {
           <MarketClock key={clock.city} clock={clock} now={now} />
         ))}
       </section>
+      <ActiveMarketCards clocks={CLOCKS} now={now} />
     </main>
   );
 }
