@@ -5,6 +5,7 @@ type LocalTimeParts = {
   hour: number;
   minute: number;
   second: number;
+  millisecond: number;
 };
 
 type SessionWindow = {
@@ -63,6 +64,7 @@ function getLocalTimeParts(now: Date, timeZone: string): LocalTimeParts {
     hour: Number(values.hour),
     minute: Number(values.minute),
     second: Number(values.second),
+    millisecond: now.getMilliseconds(),
   };
 }
 
@@ -85,7 +87,8 @@ function getWeeklySecond(parts: LocalTimeParts) {
     parts.weekday * secondsPerDay +
     parts.hour * secondsPerHour +
     parts.minute * secondsPerMinute +
-    parts.second
+    parts.second +
+    parts.millisecond / 1000
   );
 }
 
@@ -147,7 +150,8 @@ export function getMarketRingState(
     ({ open, close }) => currentWeekSecond >= open && currentWeekSecond < close,
   );
 
-  const secondProgress = (secondsPerMinute - parts.second) / secondsPerMinute;
+  const secondValue = parts.second + parts.millisecond / 1000;
+  const secondProgress = (secondsPerMinute - secondValue) / secondsPerMinute;
 
   if (currentSession) {
     const elapsed = currentWeekSecond - currentSession.open;

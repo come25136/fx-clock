@@ -6,20 +6,18 @@ export function useCurrentTime() {
   const [now, setNow] = useState<Date | null>(null);
 
   useEffect(() => {
-    let timeoutId: number | undefined;
+    let frameId: number | undefined;
 
     const tick = () => {
       setNow(new Date());
-
-      const delay = 1000 - (Date.now() % 1000);
-      timeoutId = window.setTimeout(tick, delay);
+      frameId = window.requestAnimationFrame(tick);
     };
 
     tick();
 
     return () => {
-      if (timeoutId !== undefined) {
-        window.clearTimeout(timeoutId);
+      if (frameId !== undefined) {
+        window.cancelAnimationFrame(frameId);
       }
     };
   }, []);
