@@ -20,8 +20,6 @@ type TimelineSegment = {
 type SegmentLayout = {
   leftPercent: number;
   widthPercent: number;
-  flagOffsetPercent: number;
-  pairAnchorPercent: number | null;
   pairAlign: "left" | "right";
   clippedLeft: boolean;
   clippedRight: boolean;
@@ -29,6 +27,7 @@ type SegmentLayout = {
 
 type TimelineRow = {
   clock: ClockConfig;
+  pairText: string;
   segments: TimelineSegment[];
 };
 
@@ -89,10 +88,19 @@ const openTimeClass = `shrink-0 ${barStrongClass}`;
 const closeTimeClass = `shrink-0 text-right ${barStrongClass}`;
 
 let measureCanvas: HTMLCanvasElement | null = null;
+const textWidthCache = new Map<string, number>();
 
 function measureTextWidthPx(text: string, fontSizePx: number, fontWeight: number) {
   if (typeof document === "undefined") {
     return text.length * fontSizePx;
+  }
+
+  const fontFamily = getComputedStyle(document.body).fontFamily;
+  const cacheKey = `${fontWeight}:${fontSizePx}:${fontFamily}:${text}`;
+  const cached = textWidthCache.get(cacheKey);
+
+  if (cached !== undefined) {
+    return cached;
   }
 
   measureCanvas ??= document.createElement("canvas");
@@ -102,10 +110,12 @@ function measureTextWidthPx(text: string, fontSizePx: number, fontWeight: number
     return text.length * fontSizePx;
   }
 
-  const fontFamily = getComputedStyle(document.body).fontFamily;
   context.font = `${fontWeight} ${fontSizePx}px ${fontFamily}`;
 
-  return Math.ceil(context.measureText(text).width);
+  const width = Math.ceil(context.measureText(text).width);
+  textWidthCache.set(cacheKey, width);
+
+  return width;
 }
 
 function formatTime(date: Date) {
@@ -189,6 +199,7 @@ function buildSegments(clock: ClockConfig, anchor: Date): TimelineSegment[] {
 function buildRows(clocks: ClockConfig[], anchor: Date): TimelineRow[] {
   return clocks.map((clock) => ({
     clock,
+    pairText: clock.pairs.join("　"),
     segments: buildSegments(clock, anchor),
   }));
 }
@@ -219,18 +230,11 @@ function buildHourMarkers(anchor: Date): HourMarker[] {
 function getSegmentLayout(segment: TimelineSegment, translatePercent: number): SegmentLayout {
   const leftPercent = segment.startRatio * 100 - translatePercent;
   const widthPercent = Math.max((segment.endRatio - segment.startRatio) * 100, 1.8);
-  const hiddenLeftPercent = Math.max(0, -leftPercent);
-  const flagOffsetPercent = Math.min((hiddenLeftPercent / widthPercent) * 100, 100);
   const midpointPercent = leftPercent + widthPercent / 2;
-  const centerAnchorPercent = ((50 - leftPercent) / widthPercent) * 100;
-  const pairAnchorPercent =
-    centerAnchorPercent >= 0 && centerAnchorPercent <= 100 ? centerAnchorPercent : null;
 
   return {
     leftPercent,
     widthPercent,
-    flagOffsetPercent,
-    pairAnchorPercent,
     pairAlign: midpointPercent < 50 ? "right" : "left",
     clippedLeft: leftPercent < 0,
     clippedRight: leftPercent + widthPercent > 100,
@@ -298,7 +302,7 @@ export function MarketSessionTimeline({ clocks, now }: MarketSessionTimelineProp
       <div className={rowsClass}>
         <div className={nowLineClass} style={nowLineStyle} aria-hidden="true" />
 
-        {rows.map(({ clock, segments }) => (
+        {rows.map(({ clock, pairText, segments }) => (
           <article key={clock.city} className="relative" aria-label={`${clock.city} session`}>
             <div className={trackClass}>
               <div className={axisInnerClass} style={contentStyle}>
@@ -306,7 +310,6 @@ export function MarketSessionTimeline({ clocks, now }: MarketSessionTimelineProp
                   segments.map((segment) => (
                     (() => {
                       const layout = getSegmentLayout(segment, translatePercent);
-                      const pairText = clock.pairs.join("　");
                       const openWidthPx = measureTextWidthPx(segment.startLabel, barFontSizePx, 700);
                       const closeWidthPx = measureTextWidthPx(segment.endLabel, barFontSizePx, 700);
                       const pairTextWidthPx = measureTextWidthPx(pairText, barFontSizePx, 400);
@@ -324,7 +327,6 @@ export function MarketSessionTimeline({ clocks, now }: MarketSessionTimelineProp
                       );
                       const availableRightPx = pairSlotWidthPx - pairIndentPx;
                       const canAttachToCenter =
-                        layout.pairAnchorPercent !== null &&
                         centerAnchorPx >= pairBaseStartPx &&
                         availableRightPx >= pairTextWidthPx;
 
