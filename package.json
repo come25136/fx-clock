@@ -5,6 +5,7 @@
   "scripts": {
     "build": "next build",
     "dev": "next dev",
+    "generate:jihou": "node scripts/generate-voicevox-jihou.mjs",
     "start": "next start",
     "lint": "eslint"
   },
