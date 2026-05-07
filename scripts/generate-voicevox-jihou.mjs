@@ -4,6 +4,7 @@ import path from "node:path";
 const voicevoxBaseUrl =
   process.env.VOICEVOX_BASE_URL ?? "http://127.0.0.1:50021";
 const speakerId = Number(process.env.VOICEVOX_SPEAKER ?? "3");
+const concurrency = Math.max(1, Number(process.env.JIHOU_CONCURRENCY ?? "6"));
 const outputDir = path.join(process.cwd(), "public", "jihou");
 
 function formatAnnouncement(hours, minutes) {
@@ -48,26 +49,53 @@ async function synthesize(text) {
 async function main() {
   await fs.mkdir(outputDir, { recursive: true });
 
-  const manifest = [];
+  const jobs = [];
 
   for (let hours = 0; hours < 24; hours += 1) {
-    for (let minutes = 0; minutes < 60; minutes += 5) {
+    for (let minutes = 0; minutes < 60; minutes += 1) {
       const text = formatAnnouncement(hours, minutes);
       const fileName = formatFileName(hours, minutes);
+      jobs.push({
+        hours,
+        minutes,
+        text,
+        fileName,
+      });
+    }
+  }
+
+  const manifest = new Array(jobs.length);
+  let nextJobIndex = 0;
+
+  async function worker() {
+    while (true) {
+      const jobIndex = nextJobIndex;
+      nextJobIndex += 1;
+
+      const job = jobs[jobIndex];
+      if (!job) {
+        return;
+      }
+
+      const { hours, minutes, text, fileName } = job;
       const filePath = path.join(outputDir, fileName);
       const audio = await synthesize(text);
 
       await fs.writeFile(filePath, audio);
-      manifest.push({
+      manifest[jobIndex] = {
         hours,
         minutes,
         text,
         file: `/jihou/${fileName}`,
-      });
+      };
 
       console.log(`generated ${fileName} (${text})`);
     }
   }
+
+  await Promise.all(
+    Array.from({ length: Math.min(concurrency, jobs.length) }, () => worker()),
+  );
 
   await fs.writeFile(
     path.join(outputDir, "manifest.json"),
@@ -76,6 +104,7 @@ async function main() {
         generatedAt: new Date().toISOString(),
         voicevoxBaseUrl,
         speakerId,
+        concurrency,
         entries: manifest,
       },
       null,
